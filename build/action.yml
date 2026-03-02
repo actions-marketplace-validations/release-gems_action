@@ -1,0 +1,21 @@
+name: release-gems Build
+description: Build Ruby gems and upload them as GitHub Actions artifacts
+inputs:
+  github-token:
+    description: GitHub token for uploading artifacts and creating attestations
+    required: false
+    default: ${{ github.token }}
+  job:
+    description: Identifier to differentiate concurrent build jobs (e.g., for different architectures). Non-alphanumeric-or-hyphen characters are sanitized to hyphens.
+    required: false
+    default: default
+  retention-days:
+    description: Artifact retention period in days. Defaults to the account-level GitHub Actions default.
+    required: false
+  ruby:
+    description: Path or name of the Ruby binary used to invoke the gem-building script
+    required: false
+    default: ruby
+runs:
+  using: node24
+  main: index.js

@@ -1,0 +1,10 @@
+name: release-gems Publish
+description: Download gem artifacts, create GitHub release, and push gems to registries
+inputs:
+  github-token:
+    description: GitHub token for downloading artifacts, fetching config, and managing GitHub releases
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: node24
+  main: index.js
