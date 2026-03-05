@@ -7,7 +7,7 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import * as z from "zod";
 import { uploadGemArtifact } from "./lib/artifact";
-import { loadConfigLocal } from "./lib/config";
+import { type HookConfig, loadConfigLocal } from "./lib/config";
 import { type GemBuildResult, buildGem } from "./lib/gem";
 import { runHook } from "./lib/hook";
 import { getInputs } from "./lib/input";
@@ -24,11 +24,15 @@ function sanitizeJobId(job: string): string {
 
 type BuildResult = GemBuildResult & { provenancePath: string };
 
-async function build(
-  target: TargetGem,
-  ruby: string,
-  token: string,
-): Promise<BuildResult> {
+async function build({
+  target,
+  ruby,
+  token,
+}: {
+  target: TargetGem;
+  ruby: string;
+  token: string;
+}): Promise<BuildResult> {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "release-gems-"));
   const hookEnv = {
     RELEASE_GEMS_GEM_NAME: target.info.name,
@@ -40,7 +44,7 @@ async function build(
     runHook(target.gemConfig.hooks?.prebuild, target.dir, hookEnv),
   );
 
-  const result = await core.group(`Pack gem ${target.info.name}`, async () => {
+  const result = await core.group(`Pack ${target.info.name}`, async () => {
     return buildGem(ruby, target.gemspecPath, outDir);
   });
 
@@ -69,50 +73,44 @@ async function build(
   return { ...result, provenancePath };
 }
 
-async function run(): Promise<void> {
-  const {
-    "github-token": token,
-    job: jobId,
-    "retention-days": retentionDays,
-    ruby,
-  } = getInputs({
-    "github-token": z.string(),
-    job: z.string().default("default").transform(sanitizeJobId),
-    "retention-days": z.number().optional(),
-    ruby: z.string().default("ruby"),
-  });
-
-  const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
-  const config = await loadConfigLocal(workspace);
-  const tagInfo = parseTag(github.context.ref);
-
-  const targets = selectTargets(
-    resolveGemCandidates(workspace, config, ruby),
-    tagInfo,
+async function* buildTargets({
+  globalHooks,
+  workspace,
+  targets,
+  ruby,
+  token,
+}: {
+  globalHooks: HookConfig | undefined;
+  workspace: string;
+  targets: TargetGem[];
+  ruby: string;
+  token: string;
+}): AsyncGenerator<BuildResult> {
+  await core.group("Run global prebuild hook", async () =>
+    runHook(globalHooks?.prebuild, workspace),
   );
 
-  const buildResults = await core.group("Build gems", async () => {
-    await core.group("Run global prebuild hook", async () =>
-      runHook(config.hooks?.prebuild, workspace),
+  for (const target of targets) {
+    yield await core.group(`Build ${target.gemspecRelPath}`, async () =>
+      build({ target, ruby, token }),
     );
+  }
 
-    const results: BuildResult[] = [];
-    for (const target of targets) {
-      const result = await core.group(
-        `Build ${target.gemspecRelPath}`,
-        async () => build(target, ruby, token),
-      );
-      results.push(result);
-    }
+  await core.group("Run global postbuild hook", async () =>
+    runHook(globalHooks?.postbuild, workspace),
+  );
+}
 
-    await core.group("Run global postbuild hook", async () =>
-      runHook(config.hooks?.postbuild, workspace),
-    );
-
-    return results;
-  });
-
-  for (const result of buildResults) {
+async function uploadArtifacts({
+  results,
+  jobId,
+  retentionDays,
+}: {
+  results: BuildResult[];
+  jobId: string;
+  retentionDays: number | undefined;
+}): Promise<void> {
+  for (const result of results) {
     const directory = path.dirname(result.path);
 
     await core.group(`Upload artifacts for ${result.name}`, async () =>
@@ -135,6 +133,37 @@ async function run(): Promise<void> {
       }),
     );
   }
+}
+
+async function run(): Promise<void> {
+  const {
+    "github-token": token,
+    job: jobId,
+    "retention-days": retentionDays,
+    ruby,
+  } = getInputs({
+    "github-token": z.string(),
+    job: z.string().default("default").transform(sanitizeJobId),
+    "retention-days": z.number().optional(),
+    ruby: z.string().default("ruby"),
+  });
+
+  const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
+  const config = await loadConfigLocal(workspace);
+  const tagInfo = parseTag(github.context.ref);
+
+  const candidates = resolveGemCandidates(workspace, config, ruby);
+  const targets = selectTargets(candidates, tagInfo);
+  const results = await Array.fromAsync(
+    buildTargets({
+      globalHooks: config.hooks,
+      workspace,
+      targets,
+      ruby,
+      token,
+    }),
+  );
+  await uploadArtifacts({ results, jobId, retentionDays });
 }
 
 export const completed = run().catch((err) => {
