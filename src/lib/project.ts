@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Config, GemConfig } from "./config";
-import { type GemInfo, inspectGemspec } from "./gem";
+import { type Gemspec, loadGemspec } from "./gem";
 import type { TagInfo } from "./tag";
 
 export interface TargetGem {
@@ -9,7 +9,7 @@ export interface TargetGem {
   dir: string;
   gemspecPath: string;
   gemspecRelPath: string;
-  info: GemInfo;
+  info: Gemspec;
 }
 
 function resolveGemspec(
@@ -55,7 +55,7 @@ export function resolveGemCandidates(
       workspace,
       gemConfig,
     );
-    const info = inspectGemspec(ruby, gemspecPath);
+    const info = loadGemspec(ruby, gemspecPath);
     candidates.push({ gemConfig, dir, gemspecPath, gemspecRelPath, info });
   }
   return candidates;

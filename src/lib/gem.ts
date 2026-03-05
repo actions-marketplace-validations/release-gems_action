@@ -2,17 +2,18 @@ import * as path from "node:path";
 import { z } from "zod";
 import { runRuby } from "./ruby";
 
-const GemInfoSchema = z.object({
+const GemspecSchema = z.object({
   name: z.string(),
   version: z.string(),
+  platform: z.string(),
 });
-export type GemInfo = z.infer<typeof GemInfoSchema>;
+export type Gemspec = z.infer<typeof GemspecSchema>;
 
-export function inspectGemspec(ruby: string, gemspecPath: string): GemInfo {
+export function loadGemspec(ruby: string, gemspecPath: string): Gemspec {
   const script = `\
 require 'rubygems'
 spec = Gem::Specification.load(ARGV[0]) or fail "Cannot load gemspec: #{ARGV[0]}"
-return {name: spec.name, version: spec.version.to_s}
+return {name: spec.name, version: spec.version.to_s, platform: spec.platform}
 `;
 
   const absGemspecPath = path.resolve(gemspecPath);
@@ -22,7 +23,7 @@ return {name: spec.name, version: spec.version.to_s}
       cwd: path.dirname(absGemspecPath),
       script,
       args: [absGemspecPath],
-      schema: GemInfoSchema,
+      schema: GemspecSchema,
     });
   } catch (err) {
     throw new Error(`failed to inspect ${gemspecPath}`, { cause: err });
@@ -31,9 +32,6 @@ return {name: spec.name, version: spec.version.to_s}
 
 const GemBuildResultSchema = z.object({
   path: z.string(),
-  name: z.string(),
-  version: z.string(),
-  platform: z.string(),
 });
 export type GemBuildResult = z.infer<typeof GemBuildResultSchema>;
 
@@ -48,7 +46,7 @@ require 'rubygems/package'
 spec = Gem::Specification.load(ARGV[0]) or fail "Cannot load gemspec: #{ARGV[0]}"
 gem_path = File.join(ARGV[1], spec.file_name)
 Gem::Package.build(spec, false, false, gem_path)
-return {path: gem_path, name: spec.name, version: spec.version.to_s, platform: spec.platform.to_s}
+return {path: gem_path}
 `;
 
   const absGemspecPath = path.resolve(gemspecPath);

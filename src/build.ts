@@ -8,7 +8,7 @@ import * as github from "@actions/github";
 import * as z from "zod";
 import { uploadGemArtifact } from "./lib/artifact";
 import { type HookConfig, loadConfigLocal } from "./lib/config";
-import { type GemBuildResult, buildGem } from "./lib/gem";
+import { type GemBuildResult, type Gemspec, buildGem } from "./lib/gem";
 import { runHook } from "./lib/hook";
 import { getInputs } from "./lib/input";
 import {
@@ -22,7 +22,10 @@ function sanitizeJobId(job: string): string {
   return job.replace(/[^a-zA-Z0-9-]/g, "-");
 }
 
-type BuildResult = GemBuildResult & { provenancePath: string };
+type BuildResult = GemBuildResult & {
+  gemspec: Gemspec;
+  provenancePath: string;
+};
 
 async function build({
   target,
@@ -70,7 +73,7 @@ async function build({
     runHook(target.gemConfig.hooks?.postbuild, target.dir, hookEnv),
   );
 
-  return { ...result, provenancePath };
+  return { ...result, gemspec: target.info, provenancePath };
 }
 
 async function* buildTargets({
@@ -113,10 +116,10 @@ async function uploadArtifacts({
   for (const result of results) {
     const directory = path.dirname(result.path);
 
-    await core.group(`Upload artifacts for ${result.name}`, async () =>
+    await core.group(`Upload artifacts for ${result.gemspec.name}`, async () =>
       uploadGemArtifact({
         jobId,
-        gemName: result.name,
+        gemName: result.gemspec.name,
         directory,
         index: {
           gem: {
