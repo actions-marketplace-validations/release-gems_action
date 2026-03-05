@@ -190,7 +190,7 @@ describe("loadConfigLocal", () => {
     try {
       fs.mkdirSync(path.join(tmpDir, ".github"));
       fs.writeFileSync(
-        path.join(tmpDir, ".github", "release-gems.yaml"),
+        path.join(tmpDir, ".github", "release-gems.yml"),
         `gems:
   - directory: foo
 hooks:
@@ -226,7 +226,7 @@ registries:
     try {
       fs.mkdirSync(path.join(tmpDir, ".github"));
       fs.writeFileSync(
-        path.join(tmpDir, ".github", "release-gems.yaml"),
+        path.join(tmpDir, ".github", "release-gems.yml"),
         "",
         "utf8",
       );

@@ -196,7 +196,7 @@ describe("build action", () => {
       gemspecContent("bar", "2.0.0"),
     );
     fs.writeFileSync(
-      path.join(workspace, ".github", "release-gems.yaml"),
+      path.join(workspace, ".github", "release-gems.yml"),
       "gems:\n- gemspec: foo.gemspec\n- gemspec: bar.gemspec\n",
     );
     process.env.GITHUB_REF = "refs/tags/bar/v2.0.0";
@@ -223,7 +223,7 @@ describe("build action", () => {
       gemspecContent("foo", "1.0.0"),
     );
     fs.writeFileSync(
-      path.join(workspace, ".github", "release-gems.yaml"),
+      path.join(workspace, ".github", "release-gems.yml"),
       "gems:\n- gemspec: foo.gemspec\n",
     );
     process.env.GITHUB_REF = "refs/tags/nonexistent/v1.0.0";
@@ -243,7 +243,7 @@ describe("build action", () => {
       gemspecContent("foo", "1.0.0"),
     );
     fs.writeFileSync(
-      path.join(workspace, ".github", "release-gems.yaml"),
+      path.join(workspace, ".github", "release-gems.yml"),
       [
         "gems:",
         "- gemspec: foo.gemspec",

@@ -66,7 +66,7 @@ function isENOENT(err: unknown): boolean {
 
 export async function loadConfigLocal(workspace: string): Promise<Config> {
   // We have a working tree
-  const configPath = path.join(workspace, ".github", "release-gems.yaml");
+  const configPath = path.join(workspace, ".github", "release-gems.yml");
   return fs.promises
     .readFile(configPath, { encoding: "utf-8" })
     .then(parseConfig, (err: unknown) => {
@@ -89,7 +89,7 @@ export async function loadConfig(
     const response = await octokit.rest.repos.getContent({
       ...context.repo,
       ref: context.sha,
-      path: ".github/release-gems.yaml",
+      path: ".github/release-gems.yml",
     });
 
     const data = response.data;
@@ -98,7 +98,7 @@ export async function loadConfig(
       return parseConfig(decoded);
     }
     throw new Error(
-      "Something went wrong when fetching .github/release-gems.yaml",
+      "Something went wrong when fetching .github/release-gems.yml",
     );
   } catch (err) {
     if ((err as { status?: number }).status === 404) return DEFAULT_CONFIG;

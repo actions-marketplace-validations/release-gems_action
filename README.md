@@ -56,7 +56,7 @@ The gem version in your `.gemspec` must match the tag version (`v1.2.0` → `1.2
 
 ## Configuration
 
-For advanced setups, create `.github/release-gems.yaml`:
+For advanced setups, create `.github/release-gems.yml`:
 
 ```yaml
 gems:
