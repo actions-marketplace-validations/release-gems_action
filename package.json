@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
     "@actions/artifact": "^2.3.2",
     "@actions/attest": "^1.6.0",

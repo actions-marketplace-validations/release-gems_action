@@ -6,9 +6,12 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
       - uses: pnpm/action-setup@v4
       - run: pnpm install
       - run: pnpm lint
@@ -20,12 +23,13 @@ jobs:
             exit 1
           fi
   test:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ruby/setup-ruby@v1
+      - uses: actions/setup-node@v6
         with:
-          ruby-version: 4.0
+          node-version-file: package.json
+      - uses: ruby/setup-ruby@v1
       - uses: pnpm/action-setup@v4
       - run: pnpm install
       - run: pnpm test
