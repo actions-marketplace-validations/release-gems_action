@@ -1,2 +1,2 @@
-pack/index.js linguist-generated=true -diff
-publish/index.js linguist-generated=true -diff
+build/index.js linguist-generated=true binary
+publish/index.js linguist-generated=true binary
