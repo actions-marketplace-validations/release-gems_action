@@ -103,9 +103,11 @@ async function run(): Promise<void> {
       ...releaseNote,
     });
     if (release.draft) {
-      for (const artifact of artifacts) {
-        pushToRelease({ octokit, repo, release, artifact });
-      }
+      await Promise.all(
+        artifacts.map((artifact) =>
+          pushToRelease({ octokit, repo, release, artifact }),
+        ),
+      );
 
       await rel.finalize({
         octokit,
