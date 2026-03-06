@@ -4,7 +4,10 @@ import * as core from "@actions/core";
 import { z } from "zod";
 import type { RegistryConfig } from "./config";
 
-const ExchangeTokenResponseSchema = z.object({ api_key: z.string() });
+const ExchangeTokenResponseSchema = z.object({
+  name: z.string(),
+  rubygems_api_key: z.string(),
+});
 
 export const RUBYGEMS_ORG = "rubygems.org";
 
@@ -34,7 +37,12 @@ export async function exchangeOidcToken(): Promise<string> {
     );
   }
 
-  return ExchangeTokenResponseSchema.parse(await response.json()).api_key;
+  const resp = ExchangeTokenResponseSchema.parse(await response.json());
+  core.setSecret(resp.rubygems_api_key);
+
+  core.info(`Credentials received: ${JSON.stringify(resp)}`);
+
+  return resp.rubygems_api_key;
 }
 
 /**

@@ -212,7 +212,10 @@ beforeEach(() => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({ api_key: "mock-api-key" }),
+        json: async () => ({
+          name: "publisher",
+          rubygems_api_key: "mock-api-key",
+        }),
         text: async () => "",
       });
     }

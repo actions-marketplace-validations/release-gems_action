@@ -5,12 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RegistryConfig } from "./config";
 import { exchangeOidcToken, pushToRegistry } from "./registry";
 
-const { mockGetIDToken } = vi.hoisted(() => ({
+const { mockGetIDToken, mockSetSecret } = vi.hoisted(() => ({
   mockGetIDToken: vi.fn<() => Promise<string>>(),
+  mockSetSecret: vi.fn<(secret: string) => void>(),
 }));
 
-vi.mock("@actions/core", () => ({
+vi.mock("@actions/core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@actions/core")>()),
   getIDToken: mockGetIDToken,
+  setSecret: mockSetSecret,
 }));
 
 const mockFetch = vi.fn<typeof fetch>();
@@ -35,69 +38,36 @@ describe("exchangeOidcToken", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockGetIDToken.mockReset();
+    mockSetSecret.mockReset();
   });
 
-  it("calls getIDToken with audience 'rubygems.org'", async () => {
-    mockGetIDToken.mockResolvedValue("oidc-token");
-    mockFetch.mockResolvedValue(
-      makeResponse(200, JSON.stringify({ api_key: "abc" })),
-    );
-
-    await exchangeOidcToken();
-
-    expect(mockGetIDToken).toHaveBeenCalledWith("rubygems.org");
-  });
-
-  it("posts to the correct URL", async () => {
-    mockGetIDToken.mockResolvedValue("oidc-token");
-    mockFetch.mockResolvedValue(
-      makeResponse(200, JSON.stringify({ api_key: "abc" })),
-    );
-
-    await exchangeOidcToken();
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://rubygems.org/api/v1/oidc/trusted_publisher/exchange_token",
-      expect.anything(),
-    );
-  });
-
-  it("sends the OIDC token as jwt in the JSON body", async () => {
+  it("exchanges the OIDC token for a short-lived API key", async () => {
     mockGetIDToken.mockResolvedValue("my-oidc-jwt");
     mockFetch.mockResolvedValue(
-      makeResponse(200, JSON.stringify({ api_key: "key" })),
-    );
-
-    await exchangeOidcToken();
-
-    const [, options] = mockFetch.mock.calls[0];
-    expect(options?.body).toBe(JSON.stringify({ jwt: "my-oidc-jwt" }));
-  });
-
-  it("sends Content-Type and Accept: application/json headers", async () => {
-    mockGetIDToken.mockResolvedValue("my-oidc-jwt");
-    mockFetch.mockResolvedValue(
-      makeResponse(200, JSON.stringify({ api_key: "key" })),
-    );
-
-    await exchangeOidcToken();
-
-    const [, options] = mockFetch.mock.calls[0];
-    expect(options?.headers).toMatchObject({
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    });
-  });
-
-  it("returns the api_key field from the response JSON", async () => {
-    mockGetIDToken.mockResolvedValue("token");
-    mockFetch.mockResolvedValue(
-      makeResponse(200, JSON.stringify({ api_key: "short-lived-key" })),
+      makeResponse(
+        200,
+        JSON.stringify({
+          name: "publisher",
+          rubygems_api_key: "short-lived-key",
+        }),
+      ),
     );
 
     const result = await exchangeOidcToken();
 
+    expect(mockGetIDToken).toHaveBeenCalledWith("rubygems.org");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://rubygems.org/api/v1/oidc/trusted_publisher/exchange_token",
+      expect.objectContaining({
+        body: JSON.stringify({ jwt: "my-oidc-jwt" }),
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        }),
+      }),
+    );
     expect(result).toBe("short-lived-key");
+    expect(mockSetSecret).toHaveBeenCalledWith("short-lived-key");
   });
 
   it("throws on a non-2xx HTTP response", async () => {
@@ -139,7 +109,13 @@ describe("pushToRegistry", () => {
     mockGetIDToken.mockResolvedValue("oidc-token");
     mockFetch
       .mockResolvedValueOnce(
-        makeResponse(200, JSON.stringify({ api_key: "rubygems_api_key" })),
+        makeResponse(
+          200,
+          JSON.stringify({
+            name: "publisher",
+            rubygems_api_key: "rubygems_api_key",
+          }),
+        ),
       )
       .mockResolvedValueOnce(makeResponse(pushStatus, pushBody));
   }
@@ -173,7 +149,13 @@ describe("pushToRegistry", () => {
     mockGetIDToken.mockResolvedValue("oidc-token");
     mockFetch
       .mockResolvedValueOnce(
-        makeResponse(200, JSON.stringify({ api_key: "rubygems_secret_key" })),
+        makeResponse(
+          200,
+          JSON.stringify({
+            name: "publisher",
+            rubygems_api_key: "rubygems_secret_key",
+          }),
+        ),
       )
       .mockResolvedValueOnce(makeResponse(200));
 
