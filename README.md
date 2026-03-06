@@ -10,7 +10,7 @@
 
 ## Quick Start
 
-Add the following workflow to `.github/workflows/release.yml`:
+Add the following workflow to `.github/workflows/main.yml`:
 
 ```yaml
 on:
@@ -29,7 +29,7 @@ jobs:
     - uses: ruby/setup-ruby@v1
       with:
         ruby-version: ruby
-    - uses: hanazuki/release-gems/build@HASH
+    - uses: release-gems/action/build@HASH
 
   publish:
     if: startsWith(github.ref, 'refs/tags/')
@@ -40,7 +40,7 @@ jobs:
       contents: write  # To create a GitHub release and publish assets
       id-token: write  # To obtain an ID token to log in RubyGems.org as a trusted publisher
     steps:
-    - uses: hanazuki/release-gems/publish@HASH
+    - uses: release-gems/action@HASH
 ```
 
 Replace `HASH` with the commit SHA or tag of the release-gems release you want to pin to.

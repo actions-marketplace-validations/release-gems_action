@@ -54,7 +54,7 @@ export default defineConfig([
   {
     input: "src/publish.ts",
     output: {
-      file: "publish/index.js",
+      file: "index.js",
       format: "cjs",
       inlineDynamicImports: true,
     },

@@ -1,5 +1,5 @@
-name: Release Gems (Build Phase)
-description: Build and publish Ruby gems (build phase)
+name: Release Gems
+description: Build and publish Ruby gems (build stage)
 inputs:
   github-token:
     description: GitHub token for uploading artifacts and creating attestations
