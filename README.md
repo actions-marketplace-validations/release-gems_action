@@ -1,11 +1,12 @@
 # release-gems
 
-release-gems is a GitHub Action that automates the release workflow for Ruby gems --- building, attesting, and publishing to RubyGems.org with minimal configuration.
+**release-gems** is a GitHub action that automates the release workflow for Ruby gems --- building, attesting provenance, and publishing to RubyGems.org or other registries with minimal configuration.
 
 ## Prerequisites
 
 - The `build` action requires Ruby to be available on the runner (e.g. via [ruby/setup-ruby@v1](https://github.com/ruby/setup-ruby)).
-- For publishing to RubyGems.org, configure your gem as a [trusted publisher](https://docs.rubygems.org/trusted-publishers/) on RubyGems.org, and create a GitHub Actions environment named `rubygems`.
+- For publishing to RubyGems.org: create an environment (say `rubygems.org`) in your GitHub repository, and configure the environment as a [trusted publisher](https://docs.rubygems.org/trusted-publishers/) on RubyGems.org.
+- The release environment and the release tags should be [protected](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment#deployment-protection-rules) to prevent unauthorized releases.
 
 ## Quick Start
 
@@ -33,7 +34,7 @@ jobs:
   publish:
     if: startsWith(github.ref, 'refs/tags/')
     needs: [build]
-    environment: rubygems
+    environment: rubygems.org
     runs-on: ubuntu-slim
     permissions:
       contents: write  # To create a GitHub release and publish assets
