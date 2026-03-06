@@ -189,7 +189,7 @@ describe("downloadGemArtifacts", () => {
       ],
     });
 
-    const result = await Array.fromAsync(downloadGemArtifacts());
+    const result = await downloadGemArtifacts();
 
     expect(result).toEqual([]);
     expect(mockDownloadArtifact).not.toHaveBeenCalled();
@@ -210,7 +210,7 @@ describe("downloadGemArtifacts", () => {
       .mockResolvedValueOnce({ downloadPath: dir10 })
       .mockResolvedValueOnce({ downloadPath: dir30 });
 
-    const result = await Array.fromAsync(downloadGemArtifacts());
+    const result = await downloadGemArtifacts();
 
     expect(mockDownloadArtifact).toHaveBeenCalledTimes(2);
     const calledIds = mockDownloadArtifact.mock.calls.map(
@@ -229,7 +229,7 @@ describe("downloadGemArtifacts", () => {
     });
     mockDownloadArtifact.mockResolvedValue({ downloadPath: dir });
 
-    const result = await Array.fromAsync(downloadGemArtifacts());
+    const result = await downloadGemArtifacts();
 
     expect(result).toHaveLength(1);
     expect(result[0].directory).toBe(dir);
@@ -239,7 +239,7 @@ describe("downloadGemArtifacts", () => {
   it("calls listArtifacts with latest: true", async () => {
     mockListArtifacts.mockResolvedValue({ artifacts: [] });
 
-    await Array.fromAsync(downloadGemArtifacts());
+    await downloadGemArtifacts();
 
     expect(mockListArtifacts).toHaveBeenCalledWith({ latest: true });
   });
@@ -252,7 +252,7 @@ describe("downloadGemArtifacts", () => {
       ],
     });
 
-    const result = await Array.fromAsync(downloadGemArtifacts());
+    const result = await downloadGemArtifacts();
 
     expect(result).toEqual([]);
     expect(mockDownloadArtifact).not.toHaveBeenCalled();

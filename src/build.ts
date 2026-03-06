@@ -106,28 +106,32 @@ async function uploadArtifacts({
   results: BuildResult[];
   retentionDays: number | undefined;
 }): Promise<void> {
-  for (const result of results) {
-    const directory = path.dirname(result.path);
+  await Promise.all(
+    results.map((result) => {
+      const directory = path.dirname(result.path);
 
-    await core.group(`Upload artifacts for ${result.gemspec.name}`, async () =>
-      uploadGemArtifact({
-        gemspec: result.gemspec,
-        directory,
-        index: {
-          gem: {
-            filename: path.relative(directory, result.path),
-          },
-          attestations: [
-            {
-              filename: path.relative(directory, result.provenancePath),
-              mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+      return core.group(
+        `Upload artifacts for ${result.gemspec.name}`,
+        async () =>
+          uploadGemArtifact({
+            gemspec: result.gemspec,
+            directory,
+            index: {
+              gem: {
+                filename: path.relative(directory, result.path),
+              },
+              attestations: [
+                {
+                  filename: path.relative(directory, result.provenancePath),
+                  mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+                },
+              ],
             },
-          ],
-        },
-        retentionDays,
-      }),
-    );
-  }
+            retentionDays,
+          }),
+      );
+    }),
+  );
 }
 
 function checkAllowedPushHosts(

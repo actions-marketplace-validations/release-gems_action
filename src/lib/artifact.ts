@@ -60,10 +60,9 @@ export async function uploadGemArtifact({
  * Download all release-gems-* artifacts for the current workflow run.
  * Returns paths to directories containing the downloaded files.
  */
-export async function* downloadGemArtifacts(): AsyncGenerator<{
-  directory: string;
-  index: GemArtifactIndex;
-}> {
+export async function downloadGemArtifacts(): Promise<
+  { directory: string; index: GemArtifactIndex }[]
+> {
   const { artifacts } = await artifactClient.listArtifacts({ latest: true });
 
   const gemArtifacts = artifacts.filter((a) =>
@@ -71,35 +70,37 @@ export async function* downloadGemArtifacts(): AsyncGenerator<{
   );
   core.debug(`artifacts to download: ${gemArtifacts}`);
 
-  for (const artifact of gemArtifacts) {
-    const { downloadPath } = await artifactClient.downloadArtifact(
-      artifact.id,
-      {
-        path: path.join(os.tmpdir(), `release-gems-dl-${artifact.id}`),
-      },
-    );
-    if (downloadPath == null) throw new Error("Something went wrong");
-    const index = GemArtifactIndexSchema.parse(
-      JSON.parse(
-        await fs.promises.readFile(path.join(downloadPath, "index.json"), {
-          encoding: "utf8",
-        }),
-      ),
-    );
-
-    if (!fs.existsSync(path.join(downloadPath, index.gem.filename))) {
-      throw new Error(
-        `Gem '${index.gem.filename}' does not exist in the downloaded artifact archive #${artifact.id} '${artifact.name}'`,
+  return Promise.all(
+    gemArtifacts.map(async (artifact) => {
+      const { downloadPath } = await artifactClient.downloadArtifact(
+        artifact.id,
+        {
+          path: path.join(os.tmpdir(), `release-gems-dl-${artifact.id}`),
+        },
       );
-    }
-    for (const attestation of index.attestations) {
-      if (!fs.existsSync(path.join(downloadPath, attestation.filename))) {
+      if (downloadPath == null) throw new Error("Something went wrong");
+      const index = GemArtifactIndexSchema.parse(
+        JSON.parse(
+          await fs.promises.readFile(path.join(downloadPath, "index.json"), {
+            encoding: "utf8",
+          }),
+        ),
+      );
+
+      if (!fs.existsSync(path.join(downloadPath, index.gem.filename))) {
         throw new Error(
-          `Attestation '${attestation.filename}' does not exist in the downloaded artifact archive #${artifact.id} '${artifact.name}'`,
+          `Gem '${index.gem.filename}' does not exist in the downloaded artifact archive #${artifact.id} '${artifact.name}'`,
         );
       }
-    }
+      for (const attestation of index.attestations) {
+        if (!fs.existsSync(path.join(downloadPath, attestation.filename))) {
+          throw new Error(
+            `Attestation '${attestation.filename}' does not exist in the downloaded artifact archive #${artifact.id} '${artifact.name}'`,
+          );
+        }
+      }
 
-    yield { directory: downloadPath, index };
-  }
+      return { directory: downloadPath, index };
+    }),
+  );
 }

@@ -98,7 +98,7 @@ async function run(): Promise<void> {
   const registries = config.registries;
 
   const artifacts = await core.group("Download gem artifacts", async () =>
-    Array.fromAsync(downloadGemArtifacts()),
+    downloadGemArtifacts(),
   );
   checkDuplicates(artifacts);
 
