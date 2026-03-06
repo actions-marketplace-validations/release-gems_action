@@ -367,7 +367,7 @@ describe("publish action", () => {
     // Simulate a job without a local checkout by removing the .github directory.
     fs.rmSync(path.join(workspace, ".github"), { recursive: true });
 
-    const configYaml = "registries:\n- host: rubygems.org\n";
+    const configYaml = "registries:\n- host: https://rubygems.org\n";
     mockGetContent.mockResolvedValue({
       data: {
         type: "file",

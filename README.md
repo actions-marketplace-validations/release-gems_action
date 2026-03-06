@@ -69,7 +69,7 @@ hooks:                # global hooks, run once around the entire build
   prebuild: shell command
   postbuild: shell command
 registries:           # defaults to rubygems.org if omitted
-- host: rubygems.org
+- host: https://rubygems.org
 ```
 
 All fields are optional. The config file itself is optional for single-gem repositories.

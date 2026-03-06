@@ -4,12 +4,6 @@ import type * as github from "@actions/github";
 import * as yaml from "js-yaml";
 import { z } from "zod";
 
-// DNS label: starts and ends with alphanumeric, hyphens allowed in the middle.
-// Accepts a single label (e.g. "localhost") or a multi-label name where the TLD
-// is all alphabetic (2–63 chars).
-const HOST_REGEX =
-  /^(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}|[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)$/;
-
 const HookConfigSchema = z.object({
   prebuild: z.string().optional(),
   postbuild: z.string().optional(),
@@ -24,11 +18,11 @@ const GemConfigSchema = z.object({
 export type GemConfig = z.infer<typeof GemConfigSchema>;
 
 const RegistryConfigSchema = z.object({
-  host: z.string().regex(HOST_REGEX, "Must be a valid hostname or domain name"),
+  host: z.string().url(),
 });
 export type RegistryConfig = z.infer<typeof RegistryConfigSchema>;
 
-const DEFAULT_REGISTRIES: Array<RegistryConfig> = [{ host: "rubygems.org" }];
+const DEFAULT_REGISTRIES = [{ host: "https://rubygems.org" }];
 
 const ConfigSchema = z.object({
   gems: z.array(GemConfigSchema).optional(),

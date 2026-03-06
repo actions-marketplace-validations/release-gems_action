@@ -6,7 +6,7 @@ import type { RegistryConfig } from "./config";
 
 const ExchangeTokenResponseSchema = z.object({ api_key: z.string() });
 
-export const RUBYGEMS_HOST = "rubygems.org";
+export const RUBYGEMS_ORG = "rubygems.org";
 
 /**
  * Exchange a GitHub Actions OIDC token for a RubyGems.org short-lived API key
@@ -57,7 +57,7 @@ export async function pushToRegistry(
   attestationPaths: string[],
 ): Promise<void> {
   let apiKey: string;
-  if (registry.host === RUBYGEMS_HOST) {
+  if (new URL(registry.host).hostname === RUBYGEMS_ORG) {
     apiKey = await exchangeOidcToken();
   } else {
     apiKey = process.env.GEM_HOST_API_KEY ?? "";
@@ -91,7 +91,7 @@ export async function pushToRegistry(
     ),
   );
 
-  const response = await fetch(`https://${registry.host}/api/v1/gems`, {
+  const response = await fetch(apiUrl(registry, "api/v1/gems"), {
     method: "POST",
     headers: { Authorization: apiKey },
     body,
@@ -107,4 +107,8 @@ export async function pushToRegistry(
       `Failed to push gem to ${registry.host}: HTTP ${response.status} - ${responseBody}`,
     );
   }
+}
+
+function apiUrl({ host }: RegistryConfig, path: string): string {
+  return new URL(`${host}/${path}`).toString();
 }

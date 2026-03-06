@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RegistryConfig } from "./config";
-import { RUBYGEMS_HOST, exchangeOidcToken, pushToRegistry } from "./registry";
+import { exchangeOidcToken, pushToRegistry } from "./registry";
 
 const { mockGetIDToken } = vi.hoisted(() => ({
   mockGetIDToken: vi.fn<() => Promise<string>>(),
@@ -107,8 +107,12 @@ describe("pushToRegistry", () => {
   let gemPath: string;
   let attestationPath: string;
 
-  const rubygemsRegistry: RegistryConfig = { host: RUBYGEMS_HOST };
-  const otherRegistry: RegistryConfig = { host: "gems.example.com" };
+  const rubygemsRegistry: RegistryConfig = {
+    host: "https://rubygems.org",
+  };
+  const otherRegistry: RegistryConfig = {
+    host: "https://gems.example.com",
+  };
 
   const GEM_CONTENT = Buffer.from("fake gem binary content");
   const ATTESTATION_BUNDLE = {

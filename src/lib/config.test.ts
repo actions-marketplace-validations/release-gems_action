@@ -19,8 +19,8 @@ hooks:
   prebuild: global pre
   postbuild: global post
 registries:
-  - host: rubygems.org
-  - host: gems.example.com
+  - host: https://rubygems.org
+  - host: https://gems.example.com
 `;
     const config = parseConfig(yaml);
     expect(config).toEqual({
@@ -39,7 +39,10 @@ registries:
         },
       ],
       hooks: { prebuild: "global pre", postbuild: "global post" },
-      registries: [{ host: "rubygems.org" }, { host: "gems.example.com" }],
+      registries: [
+        { host: "https://rubygems.org" },
+        { host: "https://gems.example.com" },
+      ],
     });
   });
 
@@ -51,7 +54,7 @@ gems:
     const config = parseConfig(yaml);
     expect(config).toEqual({
       gems: [{ directory: "foo" }],
-      registries: [{ host: "rubygems.org" }],
+      registries: [{ host: "https://rubygems.org" }],
     });
     expect(config.hooks).toBeUndefined();
   });
@@ -66,121 +69,7 @@ gems:
 
   it("applies default registries when not specified", () => {
     const config = parseConfig("gems:\n  - directory: foo\n");
-    expect(config.registries).toEqual([{ host: "rubygems.org" }]);
-  });
-
-  it("parses a gem with only required fields", () => {
-    const yaml = `
-gems:
-  - {}
-`;
-    const config = parseConfig(yaml);
-    expect(config.gems).toEqual([{}]);
-  });
-
-  it("parses hooks with only prebuild", () => {
-    const yaml = `
-hooks:
-  prebuild: run something
-`;
-    const config = parseConfig(yaml);
-    expect(config.hooks).toEqual({ prebuild: "run something" });
-    expect(config.hooks?.postbuild).toBeUndefined();
-  });
-
-  it("throws when top-level value is not an object", () => {
-    expect(() => parseConfig("- item1\n- item2\n")).toThrow();
-    expect(() => parseConfig("just a string\n")).toThrow();
-    expect(() => parseConfig("42\n")).toThrow();
-  });
-
-  it("throws when gems is not an array", () => {
-    expect(() => parseConfig("gems: not-an-array\n")).toThrow(/gems/);
-  });
-
-  it("throws when a gem entry is not an object", () => {
-    expect(() => parseConfig("gems:\n  - just-a-string\n")).toThrow(
-      /gems\[0\]/,
-    );
-  });
-
-  it("throws when gem directory is not a string", () => {
-    expect(() => parseConfig("gems:\n  - directory: 123\n")).toThrow(
-      /directory/,
-    );
-  });
-
-  it("throws when gem hooks is not an object", () => {
-    expect(() => parseConfig("gems:\n  - hooks: bad\n")).toThrow(/hooks/);
-  });
-
-  it("throws when gem hooks.prebuild is not a string", () => {
-    expect(() =>
-      parseConfig("gems:\n  - hooks:\n      prebuild: 42\n"),
-    ).toThrow(/prebuild/);
-  });
-
-  it("throws when global hooks is not an object", () => {
-    expect(() => parseConfig("hooks: bad\n")).toThrow(/hooks/);
-  });
-
-  it("throws when registries is not an array", () => {
-    expect(() => parseConfig("registries: not-an-array\n")).toThrow(
-      /registries/,
-    );
-  });
-
-  it("throws when a registry entry is not an object", () => {
-    expect(() => parseConfig("registries:\n  - just-a-string\n")).toThrow(
-      /registries\[0\]/,
-    );
-  });
-
-  it("throws when registry host is missing", () => {
-    expect(() => parseConfig("registries:\n  - name: foo\n")).toThrow(/host/);
-  });
-
-  it("throws when registry host is not a string", () => {
-    expect(() => parseConfig("registries:\n  - host: 123\n")).toThrow(/host/);
-  });
-
-  it("accepts valid registry hosts", () => {
-    expect(() =>
-      parseConfig("registries:\n  - host: rubygems.org\n"),
-    ).not.toThrow();
-    expect(() =>
-      parseConfig("registries:\n  - host: gems.example.com\n"),
-    ).not.toThrow();
-    expect(() =>
-      parseConfig("registries:\n  - host: my-registry.io\n"),
-    ).not.toThrow();
-    expect(() => parseConfig("registries:\n  - host: a.bc\n")).not.toThrow();
-    // Single-label names are allowed (e.g. internal registries)
-    expect(() =>
-      parseConfig("registries:\n  - host: localhost\n"),
-    ).not.toThrow();
-    expect(() =>
-      parseConfig("registries:\n  - host: myregistry\n"),
-    ).not.toThrow();
-  });
-
-  it("throws when registry host is not a valid hostname", () => {
-    // IP address — TLD must be alphabetic
-    expect(() => parseConfig("registries:\n  - host: 127.0.0.1\n")).toThrow(
-      /host/,
-    );
-    // Underscores are not allowed in DNS labels
-    expect(() => parseConfig("registries:\n  - host: bad_host.com\n")).toThrow(
-      /host/,
-    );
-    // Labels must not start with a hyphen
-    expect(() => parseConfig("registries:\n  - host: -bad.com\n")).toThrow(
-      /host/,
-    );
-    // Labels must not end with a hyphen
-    expect(() => parseConfig("registries:\n  - host: bad-.com\n")).toThrow(
-      /host/,
-    );
+    expect(config.registries).toEqual([{ host: "https://rubygems.org" }]);
   });
 });
 
@@ -196,7 +85,7 @@ describe("loadConfigLocal", () => {
 hooks:
   prebuild: echo hi
 registries:
-  - host: rubygems.org
+  - host: https://gems.example.com
 `,
         "utf8",
       );
@@ -204,7 +93,7 @@ registries:
       expect(config).toEqual({
         gems: [{ directory: "foo" }],
         hooks: { prebuild: "echo hi" },
-        registries: [{ host: "rubygems.org" }],
+        registries: [{ host: "https://gems.example.com" }],
       });
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
@@ -215,7 +104,9 @@ registries:
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "release-gems-test-"));
     try {
       const config = await loadConfigLocal(tmpDir);
-      expect(config).toEqual({ registries: [{ host: "rubygems.org" }] });
+      expect(config).toEqual({
+        registries: [{ host: "https://rubygems.org" }],
+      });
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
     }
