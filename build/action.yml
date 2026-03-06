@@ -1,5 +1,5 @@
-name: release-gems Build
-description: Build Ruby gems and upload them as GitHub Actions artifacts
+name: Release Gems (Build Phase)
+description: Build and publish Ruby gems (build phase)
 inputs:
   github-token:
     description: GitHub token for uploading artifacts and creating attestations
