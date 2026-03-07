@@ -6,19 +6,23 @@
  *   context: import('@actions/github').context,
  * }} [params]
  */
-export default async function (params) {
+module.exports = async (params) => {
   if (!params) return;
   const { github, context } = params;
 
-  const ref = (await github.rest.git.getRef({
-    ...context.repo,
-    ref: context.ref.replace(/^refs\//, ""),
-  })).data;
+  const ref = (
+    await github.rest.git.getRef({
+      ...context.repo,
+      ref: context.ref.replace(/^refs\//, ""),
+    })
+  ).data;
   if (ref.object.type !== "tag") {
     throw new Error("ref is not an annotated tag");
   }
 
-  const tag = (await github.rest.git.getTag({ ...context.repo, tag_sha: ref.object.sha })).data;
+  const tag = (
+    await github.rest.git.getTag({ ...context.repo, tag_sha: ref.object.sha })
+  ).data;
   if (!tag.verification?.verified) {
     throw new Error(`tag is not verified: ${tag.verification?.reason}`);
   }
