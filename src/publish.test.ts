@@ -133,6 +133,10 @@ beforeEach(() => {
     path.join(os.tmpdir(), "release-gems-dl-test-"),
   );
 
+  // sha256 of '{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}'
+  const sigstoreSha256 =
+    "f2168ec310ea3d35dc929b480c85a91c21775cbbf36db3a37e041e5fe815f586";
+
   // Populate download dirs with fake .gem, .sigstore.json, and index.json files.
   fs.writeFileSync(path.join(downloadDir1, "foo-1.0.0.gem"), "fake gem");
   fs.writeFileSync(
@@ -147,6 +151,7 @@ beforeEach(() => {
         {
           filename: "foo-1.0.0.gem.sigstore.json",
           mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+          sha256: sigstoreSha256,
         },
       ],
     }),
@@ -164,6 +169,7 @@ beforeEach(() => {
         {
           filename: "bar-2.0.0.gem.sigstore.json",
           mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+          sha256: sigstoreSha256,
         },
       ],
     }),
@@ -348,6 +354,8 @@ describe("publish action", () => {
           {
             filename: "foo-1.0.0.gem.sigstore.json",
             mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+            sha256:
+              "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
           },
         ],
       }),
@@ -357,6 +365,98 @@ describe("publish action", () => {
 
     expect(mockSetFailed).toHaveBeenCalledWith(
       expect.stringContaining("Duplicate"),
+    );
+    expect(mockCreateRelease).not.toHaveBeenCalled();
+  });
+
+  it("shared attestation filename with same sha256 across artifacts succeeds", async () => {
+    // Monorepo case: two gems share the same provenance bundle.
+    const sharedSha256 =
+      "f2168ec310ea3d35dc929b480c85a91c21775cbbf36db3a37e041e5fe815f586";
+    const sharedAttest =
+      '{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}';
+    fs.writeFileSync(
+      path.join(downloadDir1, "provenance-f2168ec3.sigstore.json"),
+      sharedAttest,
+    );
+    fs.writeFileSync(
+      path.join(downloadDir1, "index.json"),
+      JSON.stringify({
+        gem: { filename: "foo-1.0.0.gem" },
+        attestations: [
+          {
+            filename: "provenance-f2168ec3.sigstore.json",
+            mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+            sha256: sharedSha256,
+          },
+        ],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(downloadDir2, "provenance-f2168ec3.sigstore.json"),
+      sharedAttest,
+    );
+    fs.writeFileSync(
+      path.join(downloadDir2, "index.json"),
+      JSON.stringify({
+        gem: { filename: "bar-2.0.0.gem" },
+        attestations: [
+          {
+            filename: "provenance-f2168ec3.sigstore.json",
+            mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+            sha256: sharedSha256,
+          },
+        ],
+      }),
+    );
+
+    await loadPublish();
+
+    expect(mockSetFailed).not.toHaveBeenCalled();
+  });
+
+  it("shared attestation filename with different sha256 across artifacts fails before creating release", async () => {
+    fs.writeFileSync(
+      path.join(downloadDir1, "provenance-f2168ec3.sigstore.json"),
+      '{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}',
+    );
+    fs.writeFileSync(
+      path.join(downloadDir1, "index.json"),
+      JSON.stringify({
+        gem: { filename: "foo-1.0.0.gem" },
+        attestations: [
+          {
+            filename: "provenance-f2168ec3.sigstore.json",
+            mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+            sha256:
+              "f2168ec310ea3d35dc929b480c85a91c21775cbbf36db3a37e041e5fe815f586",
+          },
+        ],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(downloadDir2, "provenance-f2168ec3.sigstore.json"),
+      "different content",
+    );
+    fs.writeFileSync(
+      path.join(downloadDir2, "index.json"),
+      JSON.stringify({
+        gem: { filename: "bar-2.0.0.gem" },
+        attestations: [
+          {
+            filename: "provenance-f2168ec3.sigstore.json",
+            mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+            sha256:
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+        ],
+      }),
+    );
+
+    await loadPublish();
+
+    expect(mockSetFailed).toHaveBeenCalledWith(
+      expect.stringContaining("Conflicting attestation files"),
     );
     expect(mockCreateRelease).not.toHaveBeenCalled();
   });

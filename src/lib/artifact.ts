@@ -19,6 +19,7 @@ const GemArtifactIndexSchema = z.object({
     z.object({
       filename: FilenameSchema,
       mediaType: z.string(),
+      sha256: z.string(),
     }),
   ),
 });

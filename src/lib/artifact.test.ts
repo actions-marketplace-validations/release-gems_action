@@ -66,6 +66,8 @@ describe("uploadGemArtifact", () => {
           {
             filename: "my-gem-1.0.0.gem.sigstore.json",
             mediaType: "application/json",
+            sha256:
+              "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
           },
         ],
       },
@@ -162,6 +164,8 @@ describe("downloadGemArtifacts", () => {
           {
             filename: attestFilename,
             mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+            sha256:
+              "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
           },
         ],
       }),

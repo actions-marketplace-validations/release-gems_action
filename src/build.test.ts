@@ -132,7 +132,7 @@ describe("build action", () => {
       [
         expect.stringContaining("index.json"),
         expect.stringContaining("foo-1.0.0.gem"),
-        expect.stringContaining("foo-1.0.0.gem.sigstore.json"),
+        expect.stringContaining("provenance-f2168ec3.sigstore.json"),
       ],
       expect.any(String),
       { retentionDays: 0 },

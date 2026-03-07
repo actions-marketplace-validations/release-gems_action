@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
@@ -54,18 +53,37 @@ async function pushToRelease({
   }
 }
 
-function checkDuplicates(
-  artifacts: { directory: string; index: GemArtifactIndex }[],
-): void {
-  const filenames = new Set<string>();
+function validateIndices(artifacts: { index: GemArtifactIndex }[]): void {
+  const gemFilenames = new Set<string>();
+  const attestationSums = new Map<string, string>(); // filename => sha256
   for (const {
     index: { gem, attestations },
   } of artifacts) {
-    for (const fn of [gem.filename, ...attestations.map((a) => a.filename)]) {
-      if (filenames.has(fn)) {
-        throw new Error(`Duplicate filename '${fn}' in artifacts`);
+    if (!gem.filename.endsWith(".gem")) {
+      throw new Error(
+        `Gem filename should have .gem suffix: '${gem.filename}'`,
+      );
+    }
+
+    if (gemFilenames.has(gem.filename)) {
+      throw new Error(`Duplicate gem files in artifacts: '${gem.filename}'`);
+    }
+    gemFilenames.add(gem.filename);
+
+    for (const { filename, sha256 } of attestations) {
+      if (!filename.endsWith(".json")) {
+        throw new Error(
+          `Attestation filename should have .json suffix: '${filename}'`,
+        );
       }
-      filenames.add(fn);
+
+      const existing = attestationSums.get(filename);
+      if (existing !== undefined && existing !== sha256) {
+        throw new Error(
+          `Conflicting attestation files in artifacts: '${filename}'`,
+        );
+      }
+      attestationSums.set(filename, sha256);
     }
   }
 }
@@ -93,7 +111,7 @@ async function run(): Promise<void> {
   const artifacts = await core.group("Download gem artifacts", async () =>
     downloadGemArtifacts(),
   );
-  checkDuplicates(artifacts);
+  validateIndices(artifacts);
 
   await core.group("Publish to GitHub Releases", async () => {
     const release = await rel.getOrCreate({

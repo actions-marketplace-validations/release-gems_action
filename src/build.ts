@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { attestProvenance } from "@actions/attest";
+import * as attest from "@actions/attest";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import * as z from "zod";
@@ -18,19 +18,24 @@ import { getInputs } from "./lib/input";
 import { type Target, resolveTargets, selectTargets } from "./lib/project";
 import { parseTag } from "./lib/tag";
 
+const ATTESTATION_HASH_DIGITS = 8;
+
 type BuildResult = GemBuildResult & {
   gemspec: Gemspec;
-  provenancePath: string;
+  attestations: { path: string; sha256: string }[];
+};
+type Attestation = {
+  name: string;
+  bundle: Buffer;
+  sha256: string;
 };
 
 async function build({
   target,
   ruby,
-  token,
 }: {
   target: Target;
   ruby: string;
-  token: string;
 }): Promise<BuildResult> {
   const gemDir = path.dirname(target.gemspecPath);
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "release-gems-"));
@@ -48,29 +53,11 @@ async function build({
     return buildGem(ruby, target.gemspecPath, outDir);
   });
 
-  const provenancePath = await core.group(
-    `Attest provenance for ${target.gemspec.name}`,
-    async () => {
-      const sha256 = createHash("sha256")
-        .update(fs.readFileSync(result.path))
-        .digest("hex");
-      const attestation = await attestProvenance({
-        subjects: [{ name: path.basename(result.path), digest: { sha256 } }],
-        token,
-      });
-
-      const provenancePath = `${result.path}.sigstore.json`;
-      fs.writeFileSync(provenancePath, JSON.stringify(attestation.bundle));
-
-      return provenancePath;
-    },
-  );
-
   await core.group(`Run postbuild hook for ${target.gemspec.name}`, async () =>
     runHook(target.gemConfig.hooks?.postbuild, gemDir, hookEnv),
   );
 
-  return { ...result, gemspec: target.gemspec, provenancePath };
+  return { ...result, gemspec: target.gemspec, attestations: [] };
 }
 
 async function* buildTargets({
@@ -78,20 +65,18 @@ async function* buildTargets({
   workspace,
   targets,
   ruby,
-  token,
 }: {
   globalHooks: HookConfig | undefined;
   workspace: string;
   targets: Target[];
   ruby: string;
-  token: string;
 }): AsyncGenerator<BuildResult> {
   await core.group("Run global prebuild hook", async () =>
     runHook(globalHooks?.prebuild, workspace),
   );
 
   for (const target of targets) {
-    yield await build({ target, ruby, token });
+    yield await build({ target, ruby });
   }
 
   await core.group("Run global postbuild hook", async () =>
@@ -101,29 +86,44 @@ async function* buildTargets({
 
 async function uploadArtifacts({
   results,
+  attestations,
   retentionDays,
 }: {
   results: BuildResult[];
+  attestations: Attestation[];
   retentionDays: number | undefined;
 }): Promise<void> {
   await Promise.all(
-    results.map((result) => {
+    results.map(async (result) => {
       const directory = path.dirname(result.path);
+
+      const attestationIndex = await Promise.all(
+        attestations.map(async (attestation) => {
+          const hash = attestation.sha256.slice(0, ATTESTATION_HASH_DIGITS);
+          const filename = `${attestation.name}-${hash}.sigstore.json`;
+          await fs.promises.writeFile(
+            path.join(directory, filename),
+            attestation.bundle,
+          );
+          return {
+            filename,
+            mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+            sha256: attestation.sha256,
+          };
+        }),
+      );
+
+      const index = {
+        gem: {
+          filename: path.relative(directory, result.path),
+        },
+        attestations: attestationIndex,
+      };
 
       return uploadGemArtifact({
         gemspec: result.gemspec,
         directory,
-        index: {
-          gem: {
-            filename: path.relative(directory, result.path),
-          },
-          attestations: [
-            {
-              filename: path.relative(directory, result.provenancePath),
-              mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
-            },
-          ],
-        },
+        index,
         retentionDays,
       });
     }),
@@ -150,6 +150,37 @@ function checkAllowedPushHosts(
   }
 }
 
+function sha256hex(data: Buffer): string {
+  return createHash("sha256").update(data).digest("hex");
+}
+
+async function attestProvenance({
+  results,
+  token,
+}: {
+  results: BuildResult[];
+  token: string;
+}) {
+  const subjects = await Promise.all(
+    results.map(async (r) => ({
+      name: path.basename(r.path),
+      digest: {
+        sha256: sha256hex(await fs.promises.readFile(r.path)),
+      },
+    })),
+  );
+  core.info(`subjects: ${JSON.stringify(subjects)}`);
+
+  const attestation = await attest.attestProvenance({ subjects, token });
+
+  core.info(`attestationID: ${attestation.attestationID}`);
+  core.info(`tlogID: ${attestation.tlogID}`);
+
+  const bundle = Buffer.from(JSON.stringify(attestation.bundle));
+  const sha256 = sha256hex(bundle);
+  return { name: "provenance", bundle, sha256 };
+}
+
 async function run(): Promise<void> {
   const {
     "github-token": token,
@@ -174,12 +205,19 @@ async function run(): Promise<void> {
       workspace,
       targets,
       ruby,
-      token,
     }),
   );
 
+  const provenance = await core.group("Attest provenance", async () =>
+    attestProvenance({ results, token }),
+  );
+
   await core.group("Upload artifacts", async () => {
-    await uploadArtifacts({ results, retentionDays });
+    await uploadArtifacts({
+      results,
+      attestations: [provenance],
+      retentionDays,
+    });
   });
 }
 
