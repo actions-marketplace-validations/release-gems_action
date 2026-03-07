@@ -26,31 +26,51 @@ async function composeRelease(
   return { name, body: (await message) ?? `Release ${name}` };
 }
 
+function collectReleaseAssets(
+  artifacts: { directory: string; index: GemArtifactIndex }[],
+): Map<string, { path: string; mediaType: string }> {
+  const files = new Map<string, { path: string; mediaType: string }>();
+  // Dedupe by filename. Assets with the same filename has the same content (enforced by validateIndices).
+  for (const { directory, index } of artifacts) {
+    files.set(index.gem.filename, {
+      path: path.join(directory, index.gem.filename),
+      mediaType: "application/octet-stream",
+    });
+    for (const attestation of index.attestations) {
+      files.set(attestation.filename, {
+        path: path.join(directory, attestation.filename),
+        mediaType: attestation.mediaType,
+      });
+    }
+  }
+  return files;
+}
+
 async function pushToRelease({
   octokit,
   repo,
   release,
-  artifact: { directory, index },
+  artifacts,
 }: {
   octokit: Octokit;
   repo: { owner: string; repo: string };
   release: rel.Release;
-  artifact: { directory: string; index: GemArtifactIndex };
+  artifacts: { directory: string; index: GemArtifactIndex }[];
 }) {
-  const files = [
-    { filename: index.gem.filename, mediaType: "application/octet-stream" },
-    ...index.attestations,
-  ];
-  for (const { filename, mediaType } of files) {
-    await rel.uploadAsset({
-      octokit,
-      repo,
-      release,
-      name: filename,
-      assetPath: path.join(directory, filename),
-      mediaType,
-    });
-  }
+  const files = collectReleaseAssets(artifacts);
+
+  return Promise.all(
+    Array.from(files, ([filename, { path, mediaType }]) =>
+      rel.uploadAsset({
+        octokit,
+        repo,
+        release,
+        name: filename,
+        assetPath: path,
+        mediaType,
+      }),
+    ),
+  );
 }
 
 function validateIndices(artifacts: { index: GemArtifactIndex }[]): void {
@@ -121,12 +141,7 @@ async function run(): Promise<void> {
       ...releaseNote,
     });
     if (release.draft) {
-      await Promise.all(
-        artifacts.map((artifact) =>
-          pushToRelease({ octokit, repo, release, artifact }),
-        ),
-      );
-
+      await pushToRelease({ octokit, repo, release, artifacts });
       await rel.finalize({
         octokit,
         repo,
@@ -153,3 +168,50 @@ async function run(): Promise<void> {
 export const completed = run().catch((err) => {
   core.setFailed(err instanceof Error ? err.message : String(err));
 });
+
+if (import.meta.vitest) {
+  const { describe, it, expect } = import.meta.vitest;
+
+  describe("collectReleaseAssets", () => {
+    it("deduplicates shared attestation files across artifacts", () => {
+      const artifacts = [
+        {
+          directory: "/dl/artifact-1",
+          index: {
+            gem: { filename: "foo-1.0.0-x86_64-linux.gem" },
+            attestations: [
+              {
+                filename: "provenance-deadbeef.sigstore.json",
+                mediaType: "application/json",
+                sha256:
+                  "deadbeef00000000000000000000000000000000000000000000000000000000",
+              },
+            ],
+          },
+        },
+        {
+          directory: "/dl/artifact-2",
+          index: {
+            gem: { filename: "foo-1.0.0-arm64-linux.gem" },
+            attestations: [
+              {
+                filename: "provenance-deadbeef.sigstore.json",
+                mediaType: "application/json",
+                sha256:
+                  "deadbeef00000000000000000000000000000000000000000000000000000000",
+              },
+            ],
+          },
+        },
+      ];
+
+      const files = collectReleaseAssets(artifacts);
+
+      // Two distinct gem files + one deduplicated attestation = 3 total
+      expect(files.size).toBe(3);
+      expect(files.has("foo-1.0.0-x86_64-linux.gem")).toBe(true);
+      expect(files.has("foo-1.0.0-arm64-linux.gem")).toBe(true);
+      expect(files.has("provenance-deadbeef.sigstore.json")).toBe(true);
+    });
+  });
+}
