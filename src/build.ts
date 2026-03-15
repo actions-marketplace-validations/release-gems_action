@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as attest from "@actions/attest";
+import {
+  attest as attestGeneric,
+  attestProvenance as attestProvenanceLib,
+} from "@actions/attest";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import * as z from "zod";
@@ -16,13 +19,14 @@ import { type GemBuildResult, type Gemspec, buildGem } from "./lib/gem";
 import { runHook } from "./lib/hook";
 import { getInputs } from "./lib/input";
 import { type Target, resolveTargets, selectTargets } from "./lib/project";
+import { loadSbom } from "./lib/sbom";
 import { parseTag } from "./lib/tag";
 
 const ATTESTATION_HASH_DIGITS = 8;
 
 type BuildResult = GemBuildResult & {
   gemspec: Gemspec;
-  attestations: { path: string; sha256: string }[];
+  sha256: string;
 };
 type Attestation = {
   name: string;
@@ -57,7 +61,8 @@ async function build({
     runHook(target.gemConfig.hooks?.postbuild, gemDir, hookEnv),
   );
 
-  return { ...result, gemspec: target.gemspec, attestations: [] };
+  const sha256 = sha256hex(await fs.promises.readFile(result.path));
+  return { ...result, gemspec: target.gemspec, sha256 };
 }
 
 async function* buildTargets({
@@ -154,24 +159,18 @@ function sha256hex(data: Buffer): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
+type Subject = { name: string; digest: { sha256: string } };
+
 async function attestProvenance({
-  results,
+  subjects,
   token,
 }: {
-  results: BuildResult[];
+  subjects: Subject[];
   token: string;
-}) {
-  const subjects = await Promise.all(
-    results.map(async (r) => ({
-      name: path.basename(r.path),
-      digest: {
-        sha256: sha256hex(await fs.promises.readFile(r.path)),
-      },
-    })),
-  );
+}): Promise<Attestation> {
   core.info(`subjects: ${JSON.stringify(subjects)}`);
 
-  const attestation = await attest.attestProvenance({ subjects, token });
+  const attestation = await attestProvenanceLib({ subjects, token });
 
   core.info(`attestationID: ${attestation.attestationID}`);
   core.info(`tlogID: ${attestation.tlogID}`);
@@ -181,15 +180,49 @@ async function attestProvenance({
   return { name: "provenance", bundle, sha256 };
 }
 
+async function attestSbom({
+  subjects,
+  sbomPath,
+  predicateTypeOverride,
+  token,
+}: {
+  subjects: Subject[];
+  sbomPath: string;
+  predicateTypeOverride: string | undefined;
+  token: string;
+}): Promise<Attestation> {
+  const { predicate, predicateType } = await loadSbom(
+    sbomPath,
+    predicateTypeOverride,
+  );
+  const attestation = await attestGeneric({
+    subjects,
+    predicateType,
+    predicate,
+    token,
+  });
+
+  core.info(`attestationID: ${attestation.attestationID}`);
+  core.info(`tlogID: ${attestation.tlogID}`);
+
+  const bundle = Buffer.from(JSON.stringify(attestation.bundle));
+  const sha256 = sha256hex(bundle);
+  return { name: "sbom", bundle, sha256 };
+}
+
 async function run(): Promise<void> {
   const {
     "github-token": token,
     "retention-days": retentionDays,
     ruby,
+    sbom: sbomPath,
+    "sbom-predicate-type": predicateTypeOverride,
   } = getInputs({
     "github-token": z.string(),
     "retention-days": z.number().optional(),
     ruby: z.string().default("ruby"),
+    sbom: z.string().optional(),
+    "sbom-predicate-type": z.string().optional(),
   });
 
   const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
@@ -208,14 +241,36 @@ async function run(): Promise<void> {
     }),
   );
 
-  const provenance = await core.group("Attest provenance", async () =>
-    attestProvenance({ results, token }),
+  const subjects = results.map((r) => ({
+    name: path.basename(r.path),
+    digest: { sha256: r.sha256 },
+  }));
+
+  const attestations: Attestation[] = [];
+
+  attestations.push(
+    await core.group("Attest provenance", async () =>
+      attestProvenance({ subjects, token }),
+    ),
   );
+
+  if (sbomPath != null) {
+    attestations.push(
+      await core.group("Attest SBOM", async () =>
+        attestSbom({
+          subjects,
+          sbomPath,
+          predicateTypeOverride,
+          token,
+        }),
+      ),
+    );
+  }
 
   await core.group("Upload artifacts", async () => {
     await uploadArtifacts({
       results,
-      attestations: [provenance],
+      attestations,
       retentionDays,
     });
   });
