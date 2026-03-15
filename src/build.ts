@@ -22,7 +22,7 @@ const ATTESTATION_HASH_DIGITS = 8;
 
 type BuildResult = GemBuildResult & {
   gemspec: Gemspec;
-  attestations: { path: string; sha256: string }[];
+  sha256: string;
 };
 type Attestation = {
   name: string;
@@ -57,7 +57,8 @@ async function build({
     runHook(target.gemConfig.hooks?.postbuild, gemDir, hookEnv),
   );
 
-  return { ...result, gemspec: target.gemspec, attestations: [] };
+  const sha256 = sha256hex(await fs.promises.readFile(result.path));
+  return { ...result, gemspec: target.gemspec, sha256 };
 }
 
 async function* buildTargets({
@@ -161,14 +162,10 @@ async function attestProvenance({
   results: BuildResult[];
   token: string;
 }) {
-  const subjects = await Promise.all(
-    results.map(async (r) => ({
-      name: path.basename(r.path),
-      digest: {
-        sha256: sha256hex(await fs.promises.readFile(r.path)),
-      },
-    })),
-  );
+  const subjects = results.map((r) => ({
+    name: path.basename(r.path),
+    digest: { sha256: r.sha256 },
+  }));
   core.info(`subjects: ${JSON.stringify(subjects)}`);
 
   const attestation = await attest.attestProvenance({ subjects, token });
