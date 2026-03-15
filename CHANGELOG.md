@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v1.0.3 (2026-03-15)
+
 - Add sbom input to attach an SBOM attestation to the build. It automatically detects CyclondDX and SPDX 2.x/3.x formats.
 - Provenance attestation is now a single multi-subject bundle covering all the gems built in a job.
 
