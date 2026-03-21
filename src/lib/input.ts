@@ -1,14 +1,19 @@
 import * as core from "@actions/core";
-import type * as z from "zod";
+import * as z from "zod";
 
-function getInput<T extends z.ZodTypeAny>(name: string, schema: T) {
+function getInput<
+  T extends z.ZodType<unknown, z.ZodTypeDef, string | undefined>,
+>(name: string, schema: T) {
   const value = core.getInput(name);
   return schema.safeParse(value === "" ? undefined : value);
 }
 
-export function getInputs<T extends Record<string, z.ZodTypeAny>>(
-  schemata: T,
-): { [K in keyof T]: z.infer<T[K]> } {
+export function getInputs<
+  T extends Record<
+    string,
+    z.ZodType<unknown, z.ZodTypeDef, string | undefined>
+  >,
+>(schemata: T): { [K in keyof T]: z.infer<T[K]> } {
   const values: Record<string, unknown> = {};
   const errors: string[] = [];
 
@@ -29,3 +34,15 @@ export function getInputs<T extends Record<string, z.ZodTypeAny>>(
 
   return values as { [K in keyof T]: z.infer<T[K]> };
 }
+
+export const IntegerSchema = z.string().transform<number>((val, ctx) => {
+  const intval = Number.parseInt(val);
+  if (Number.isNaN(intval)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "not parseable as an integer",
+    });
+    return z.NEVER;
+  }
+  return intval;
+});

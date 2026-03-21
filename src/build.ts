@@ -17,7 +17,7 @@ import {
 } from "./lib/config";
 import { type GemBuildResult, type Gemspec, buildGem } from "./lib/gem";
 import { runHook } from "./lib/hook";
-import { getInputs } from "./lib/input";
+import { IntegerSchema, getInputs } from "./lib/input";
 import { type Target, resolveTargets, selectTargets } from "./lib/project";
 import { loadSbom } from "./lib/sbom";
 import { parseTag } from "./lib/tag";
@@ -219,7 +219,7 @@ async function run(): Promise<void> {
     "sbom-predicate-type": predicateTypeOverride,
   } = getInputs({
     "github-token": z.string(),
-    "retention-days": z.number().optional(),
+    "retention-days": IntegerSchema.optional(),
     ruby: z.string().default("ruby"),
     sbom: z.string().optional(),
     "sbom-predicate-type": z.string().optional(),
