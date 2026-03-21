@@ -13,7 +13,7 @@ jobs:
         with:
           node-version-file: package.json
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
@@ -37,7 +37,7 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby-version }}
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
   publish:
