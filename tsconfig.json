@@ -10,7 +10,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "resolveJsonModule": true,
-    "types": ["vitest/importMeta"]
+    "types": ["vitest/importMeta", "node"]
   },
   "include": ["src/**/*"]
 }
