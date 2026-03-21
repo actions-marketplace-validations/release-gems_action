@@ -386,6 +386,36 @@ describe("build action", () => {
     ).toBe(true);
   });
 
+  it("retention-days string input is parsed as integer and passed to uploadArtifact", async () => {
+    fs.writeFileSync(
+      path.join(workspace, "foo.gemspec"),
+      gemspecContent("foo", "1.0.0"),
+    );
+
+    mockGetInput.mockImplementation((name: string) => {
+      switch (name) {
+        case "github-token":
+          return "gha-token";
+        case "retention-days":
+          return "90";
+        case "ruby":
+          return "ruby";
+        default:
+          return "";
+      }
+    });
+
+    await loadBuild();
+
+    expect(mockSetFailed).not.toHaveBeenCalled();
+    expect(mockUploadArtifact).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.any(String),
+      { retentionDays: 90 },
+    );
+  });
+
   it("per-gem prebuild hook receives gem environment variables", async () => {
     const hookOutputFile = path.join(workspace, "hook_output.txt");
     fs.writeFileSync(
