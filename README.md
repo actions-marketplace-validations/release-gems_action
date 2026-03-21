@@ -1,12 +1,17 @@
 # release-gems
 
-**release-gems** is a GitHub action that automates the release workflow for Ruby gems --- building, attesting provenance, and publishing to RubyGems.org or other registries with minimal configuration.
+**release-gems** is a GitHub action that automates the release workflow for Ruby gems: building, attesting provenance, and publishing to RubyGems.org and other registries with minimal configuration.
+
+- No dependency on Bundler or Rake (so no need for `bundle install`); reduces supply-chain risks in the release process.
+- Separate steps for building and publishing to minimize permission scope.
+- Integration with GitHub releases: gems are also uploaded to a GitHub release, where GitHub generates a release attestation. Release attestations can independently verify the package registry or a package cache is not tampered with.
 
 ## Prerequisites
 
 - The `build` action requires Ruby to be available on the runner (e.g. via [ruby/setup-ruby@v1](https://github.com/ruby/setup-ruby)). The three latest major versions of Ruby are tested.
 - For publishing to RubyGems.org: create an environment (say `rubygems.org`) in your GitHub repository, and configure the environment as a [trusted publisher](https://docs.rubygems.org/trusted-publishers/) on RubyGems.org.
 - The release environment and the release tags should be [protected](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment#deployment-protection-rules) to prevent unauthorized releases.
+- Optionally, [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
 
 ## Quick Start
 
@@ -23,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # To obtain an ID token used for provenance attestation
-      attestations: write  # To store the provenance on GitHub
+      attestations: write  # To store the attestations on GitHub
     steps:
     - uses: actions/checkout@v4
     - uses: ruby/setup-ruby@v1
@@ -54,7 +59,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-The `build` job builds and attests the gem. The `publish` job creates a GitHub release and pushes the gem to RubyGems.org.
+The `build` job builds the gem and attests the build provenance. The `publish` job creates a GitHub release and pushes the gem to RubyGems.org.
 
 The gem version in your `.gemspec` must match the tag version (`v1.2.0` → `1.2.0`). A mismatch fails the build.
 
@@ -139,6 +144,6 @@ publish:
   - uses: release-gems/action@HASH
 ```
 
-Store the API key as a secret in your GitHub repository or environment (e.g. `PRIVATE_REGISTRY_API_KEY`). The `host` value in `release-gems.yml` must match the key in `~/.gem/credentials` exactly, including scheme and trailing slash.
+Store the API key as a secret in your GitHub repository or environment (`PRIVATE_REGISTRY_API_KEY` in the example). The `host` value in `release-gems.yml` must match the key in `~/.gem/credentials` exactly, including scheme and trailing slash.
 
 To publish to multiple registries, list them all under `registries:` and write a credentials entry for each.
