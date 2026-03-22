@@ -97539,10 +97539,10 @@ enumType([
 	"False",
 	"FALSE"
 ]).transform((v) => v.toLowerCase() === "true");
-stringType().transform((val, ctx) => {
+stringType().transform((val, { addIssue }) => {
 	const intval = Number.parseInt(val, 10);
 	if (Number.isNaN(intval)) {
-		ctx.addIssue({
+		addIssue({
 			code: ZodIssueCode.custom,
 			message: "not parseable as an integer"
 		});

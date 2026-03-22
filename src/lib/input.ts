@@ -39,14 +39,16 @@ export const BooleanSchema = z
   .enum(["true", "True", "TRUE", "false", "False", "FALSE"])
   .transform((v) => v.toLowerCase() === "true");
 
-export const IntegerSchema = z.string().transform<number>((val, ctx) => {
-  const intval = Number.parseInt(val, 10);
-  if (Number.isNaN(intval)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "not parseable as an integer",
-    });
-    return z.NEVER;
-  }
-  return intval;
-});
+export const IntegerSchema = z
+  .string()
+  .transform<number>((val, { addIssue }) => {
+    const intval = Number.parseInt(val, 10);
+    if (Number.isNaN(intval)) {
+      addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "not parseable as an integer",
+      });
+      return z.NEVER;
+    }
+    return intval;
+  });
