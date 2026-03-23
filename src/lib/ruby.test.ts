@@ -1,5 +1,5 @@
 import * as os from "node:os";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { runRuby } from "./ruby";
 
@@ -39,5 +39,36 @@ describe("runRuby", () => {
         schema: z.object({}),
       }),
     ).rejects.toThrow("RuntimeError: something went wrong");
+  });
+
+  describe("environment cleaning", () => {
+    const FAKE_VARS: Record<string, string> = {
+      "INPUT_GITHUB-TOKEN": "input-secret",
+      GITHUB_TOKEN: "gh-token",
+      ACTIONS_RUNTIME_TOKEN: "actions-token",
+    };
+
+    beforeEach(() => {
+      for (const [k, v] of Object.entries(FAKE_VARS)) {
+        process.env[k] = v;
+      }
+    });
+
+    afterEach(() => {
+      for (const k of Object.keys(FAKE_VARS)) {
+        delete process.env[k];
+      }
+    });
+
+    it("does not expose INPUT_*, GITHUB_TOKEN, or ACTIONS_* to the Ruby process", async () => {
+      const result = await runRuby({
+        ruby: RUBY,
+        cwd: CWD,
+        args: [],
+        script: `ENV.slice("INPUT_GITHUB-TOKEN", "GITHUB_TOKEN", "ACTIONS_RUNTIME_TOKEN")`,
+        schema: z.record(z.string(), z.string()),
+      });
+      expect(result).toEqual({});
+    });
   });
 });

@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import * as core from "@actions/core";
+import { cleanEnv } from "./env";
 
 export interface HookEnv {
   RELEASE_GEMS_GEM_NAME?: string;
@@ -18,7 +20,7 @@ export interface HookEnv {
 export async function runHook(
   command: string | null | undefined,
   cwd: string,
-  env?: HookEnv,
+  hookEnv?: HookEnv,
 ): Promise<void> {
   if (command == null) {
     return;
@@ -27,9 +29,12 @@ export async function runHook(
   const shell = process.env.SHELL ?? "/bin/sh";
 
   return new Promise<void>((resolve, reject) => {
+    const env = { ...cleanEnv(), ...hookEnv };
+    core.debug(`environment: ${JSON.stringify(env)}`);
+    core.debug(`command: ${command}`);
     const child = spawn(shell, ["-c", command], {
       cwd,
-      env: { ...process.env, ...env },
+      env,
       stdio: "inherit",
     });
 
