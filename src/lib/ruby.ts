@@ -1,5 +1,7 @@
 import * as childProcess from "node:child_process";
+import * as core from "@actions/core";
 import { z } from "zod";
+import { cleanEnv } from "./env";
 
 export function runRuby<T extends z.ZodTypeAny>({
   ruby,
@@ -28,8 +30,11 @@ end
 `;
 
   return new Promise((resolve, reject) => {
+    const env = cleanEnv();
+    core.debug(`environment: ${JSON.stringify(env)}`);
     const proc = childProcess.spawn(ruby, ["-", ...args], {
       cwd,
+      env,
       stdio: ["pipe", "inherit", "inherit", "pipe"],
     });
 

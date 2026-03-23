@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runHook } from "./hook";
 
 describe("runHook", () => {
@@ -68,6 +68,43 @@ describe("runHook", () => {
     } finally {
       fs.rmSync(tmpFile, { force: true });
     }
+  });
+
+  describe("environment cleaning", () => {
+    const FAKE_VARS: Record<string, string> = {
+      "INPUT_GITHUB-TOKEN": "input-secret",
+      GITHUB_TOKEN: "gh-token",
+      ACTIONS_RUNTIME_TOKEN: "actions-token",
+    };
+
+    beforeEach(() => {
+      for (const [k, v] of Object.entries(FAKE_VARS)) {
+        process.env[k] = v;
+      }
+    });
+
+    afterEach(() => {
+      for (const k of Object.keys(FAKE_VARS)) {
+        delete process.env[k];
+      }
+    });
+
+    it("does not expose INPUT_*, GITHUB_TOKEN, or ACTIONS_* to hook processes", async () => {
+      const tmpFile = path.join(
+        os.tmpdir(),
+        `release-gems-hook-test-clean-env-${process.pid}-${Date.now()}`,
+      );
+      try {
+        await runHook(
+          `printenv INPUT_GITHUB-TOKEN GITHUB_TOKEN ACTIONS_RUNTIME_TOKEN > ${tmpFile} || true`,
+          "/tmp",
+        );
+        const contents = fs.readFileSync(tmpFile, "utf8");
+        expect(contents).toBe("");
+      } finally {
+        fs.rmSync(tmpFile, { force: true });
+      }
+    });
   });
 
   it("runs the command with the given cwd", async () => {
